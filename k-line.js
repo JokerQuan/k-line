@@ -36,24 +36,12 @@ class KLine {
   /**
    * 绑定弹窗触发事件，绘制虚线
    */
-  _bindPopTrigger(canvas) {
+  _bindPopTrigger() {
+    const { canvas } = this._ctx;
     canvas.addEventListener("mousemove", (e) => {
-      this._ctx.clearRect(0, 0, 900, 500)
-      this.render();
-      this._ctx.beginPath();
-      this._ctx.setLineDash([3, 3]);
-      this._ctx.strokeStyle = "gray";
-      // 横
-      this._ctx.moveTo(0, e.offsetY);
-      this._ctx.lineTo(canvas.width, e.offsetY);
-      // 竖
-      // 计算实现吸附效果
-      const x = this._xAxisPxPerUnit * (Math.ceil(e.offsetX / this._xAxisPxPerUnit) - 0.5);
-      this._ctx.moveTo(x, 0);
-      this._ctx.lineTo(x, canvas.height);
-      // 绘制
-      this._ctx.stroke();
-    })
+      this._drawDashLine(e.offsetX, e.offsetY);
+      this._popUp(e.offsetX);
+    });
     canvas.addEventListener("mouseleave", (e) => {
       this._ctx.clearRect(0, 0, 900, 500)
       this.render();
@@ -89,6 +77,50 @@ class KLine {
     this._yAxisMax = max + (max - min) / 10
   }
 
+  _drawDashLine(offsetX, offsetY) {
+    const { canvas } = this._ctx;
+    this._ctx.clearRect(0, 0, 900, 500)
+    this.render();
+    this._ctx.beginPath();
+    this._ctx.setLineDash([3, 3]);
+    this._ctx.strokeStyle = "gray";
+    // 横
+    this._ctx.moveTo(0, offsetY);
+    this._ctx.lineTo(canvas.width, offsetY);
+
+    // 竖
+    // 计算实现吸附效果
+    const x = this._xAxisPxPerUnit * (Math.ceil(offsetX / this._xAxisPxPerUnit) - 0.5);
+    this._ctx.moveTo(x, 0);
+    this._ctx.lineTo(x, canvas.height);
+    this._ctx.stroke();
+
+    // 纵轴值
+    this._ctx.fillStyle = 'rgb(245, 245, 245)';
+    this._ctx.clearRect(0, offsetY - 8, 40, 16);
+    this._ctx.fillRect(0, offsetY - 8, 40, 16);
+    this._ctx.fillStyle = 'rgb(66, 66, 66)';
+    this._ctx.font = '12px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
+    const yValue = (canvas.clientHeight - offsetY) / canvas.clientHeight * (this._yAxisMax - this._yAxisOriginMin) + this._yAxisOriginMin;
+    this._ctx.fillText(yValue.toFixed(2), 5, offsetY + 4);
+
+    // 横轴值
+    this._ctx.fillStyle = 'rgb(245, 245, 245)';
+    this._ctx.clearRect(x - 30, canvas.clientHeight - 16, 60, 16);
+    this._ctx.fillRect(x - 30, canvas.clientHeight - 16, 60, 16);
+    this._ctx.fillStyle = 'rgb(66, 66, 66)';
+    this._ctx.font = '12px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
+    const xValue = this._data[Math.floor(offsetX / this._xAxisPxPerUnit)].date;
+    this._ctx.fillText(xValue, x - 28, canvas.clientHeight - 2);
+  }
+
+  _popUp(offsetX) {
+
+  }
+
+  /**
+   * 画坐标轴
+   */
   _drawAxis() {
 
   }

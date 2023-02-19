@@ -1,7 +1,6 @@
 class KLine {
   _ctx = null;
   _data = [];
-  _renderNum = 10;
 
   // 一单位数据占几个像素
   _xAxisPxPerUnit = 0;
@@ -11,6 +10,9 @@ class KLine {
   _yAxisMax = 0;
   // y 轴原点值
   _yAxisOriginMin = 0;
+
+  _pop = null;
+  _hoverIndex = -1;
 
 
   constructor(containerSel, data) {
@@ -22,28 +24,60 @@ class KLine {
 
   _init(containerSel) {
     const container = document.querySelector(containerSel);
+    container.style.position = 'relative';
     const canvas = document.createElement("canvas");
-    canvas.width = 900;
-    canvas.height = 500;
-    canvas.style.border = "1px solid black";
     container.appendChild(canvas);
-
     this._ctx = canvas.getContext('2d');
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    // canvas.style.width = container.clientWidth + 'px';
+    // canvas.style.height = container.clientHeight + 'px';
+    // canvas.width = container.clientWidth * 2;
+    // canvas.height = container.clientHeight * 2;
+    // this._ctx.scale(2, 2);
 
+    this._createPop(container);
     this._bindPopTrigger(canvas);
+    this._bindWindowResize(container, canvas);
+  }
+
+  _bindWindowResize(container, canvas) {
+    window.onresize = () => {
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      this.render();
+    }
+  }
+
+  _createPop(container) {
+    this._pop = document.createElement("div");
+    this._pop.style.cssText = `
+      display: none;
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(235, 245, 255, .9);
+      width: 150px;
+      padding: 10px;
+      border-radius: 5px;
+    `
+    container.appendChild(this._pop);
   }
 
   /**
    * 绑定弹窗触发事件，绘制虚线
    */
-  _bindPopTrigger() {
+  _bindPopTrigger(container) {
     const { canvas } = this._ctx;
-    canvas.addEventListener("mousemove", (e) => {
+    container.addEventListener("mousemove", (e) => {
       this._drawDashLine(e.offsetX, e.offsetY);
       this._popUp(e.offsetX);
     });
-    canvas.addEventListener("mouseleave", (e) => {
-      this._ctx.clearRect(0, 0, 900, 500)
+    container.addEventListener("mouseleave", (e) => {
+      this._hoverIndex = -1;
+      this._pop.style.display = 'none';
+      this._ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight)
       this.render();
     })
   }
@@ -79,7 +113,7 @@ class KLine {
 
   _drawDashLine(offsetX, offsetY) {
     const { canvas } = this._ctx;
-    this._ctx.clearRect(0, 0, 900, 500)
+    this._ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight)
     this.render();
     this._ctx.beginPath();
     this._ctx.setLineDash([3, 3]);
@@ -115,7 +149,47 @@ class KLine {
   }
 
   _popUp(offsetX) {
+    const index = Math.floor(offsetX / this._xAxisPxPerUnit);
+    if (this._hoverIndex === index) {
+      return;
+    }
+    this._hoverIndex = index;
+    const item = this._data[index];
+    const { open, close, high, low } = item.kline;
+    const { canvas } = this._ctx;
+    let x = this._xAxisPxPerUnit * (Math.ceil(offsetX / this._xAxisPxPerUnit) - 0.5);
+    const popDom = this._pop.getBoundingClientRect();
+    if (x > (canvas.clientWidth / 2)) {
+      x = x - popDom.width - 10;
+    } else {
+      x = x + 10;
+    }
 
+    this._pop.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span>时间</span>
+        <span>${item.date}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px">
+        <span>开盘价</span>
+        <span style="color: ${open > close ? 'green' : 'red'}">${open.toFixed(3)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px">
+        <span>收盘价</span>
+        <span style="color: ${open > close ? 'green' : 'red'}">${close.toFixed(3)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px">
+        <span>最高价</span>
+        <span>${high}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px">
+        <span>最低价</span>
+        <span>${low}</span>
+      </div>
+    `;
+
+    this._pop.style.left = x + 'px';
+    this._pop.style.display = 'block';
   }
 
   /**
@@ -151,10 +225,10 @@ class KLine {
     // 开盘价、收盘价
     if (open > close) {
       this._ctx.fillStyle = 'rgb(10,171,98)';
-      this._ctx.fillRect(x, y, width, height);
+      this._ctx.fillRect(x + 1, y, width - 2, height);
     } else {
       this._ctx.strokeStyle = 'rgb(255, 51, 51)';
-      this._ctx.strokeRect(x, y, width, height);
+      this._ctx.strokeRect(x + 1, y, width - 2, height);
     }
   }
 

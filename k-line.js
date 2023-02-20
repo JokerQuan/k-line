@@ -4,8 +4,12 @@ const FONT_12PX = '12px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro 
 const FONT_14PX = '14px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
 
 class KLine {
+  _container = null;
   _ctx = null;
   _data = [];
+  // 默认显示20个值
+  _renderNum = 20;
+  _canvasLeft = 0;
 
   // 一单位数据占几个像素
   _xAxisPxPerUnit = 0;
@@ -21,19 +25,23 @@ class KLine {
 
 
   constructor(containerSel, data) {
-    this._init(containerSel);
     this._data = data;
-
+    this._init(containerSel);
+    this._renderNum = this._renderNum > data.length ? data.length : this._renderNum;
     this.render();
   }
 
   _init(containerSel) {
     const container = document.querySelector(containerSel);
+    this._container = container;
     container.style.position = 'relative';
+    container.style.overflow = 'hidden';
     const canvas = document.createElement("canvas");
+    canvas.style.position = 'absolute';
+    canvas.style.left = '0px';
     container.appendChild(canvas);
     this._ctx = canvas.getContext('2d');
-    canvas.width = container.clientWidth;
+    canvas.width = container.clientWidth / this._renderNum * this._data.length;
     canvas.height = container.clientHeight;
     // canvas.style.width = container.clientWidth + 'px';
     // canvas.style.height = container.clientHeight + 'px';
@@ -41,9 +49,62 @@ class KLine {
     // canvas.height = container.clientHeight * 2;
     // this._ctx.scale(2, 2);
 
+    // tooltip
     this._createPop(container);
     this._bindPopTrigger(canvas);
+    // 窗口缩放自适应
     this._bindWindowResize(container, canvas);
+    // 画布缩放
+    this._bindCanvasZoom(canvas);
+    // 画布拖拽
+    this._bindCanvasTranslate(canvas);
+  }
+
+  _bindCanvasZoom(canvas) {
+    this._container.addEventListener('wheel', (e) => {
+      const prevRenderNum = this._renderNum;
+      const prevCanvasWidth = canvas.width;
+      if (e.deltaY < 0) {
+        // 向上滚轮，放大
+        if (this._renderNum <= 20) return;
+        this._renderNum = this._renderNum - 2;
+        canvas.width = this._container.clientWidth / this._renderNum * this._data.length;
+      } else if (e.deltaY > 0) {
+        // 缩小
+        if (this._renderNum >= 50) return;
+        this._renderNum = this._renderNum + 2;
+        canvas.width = this._container.clientWidth / this._renderNum * this._data.length;
+      }
+      // 固定鼠标位置的offset比例缩放
+      this._canvasLeft = -(canvas.width * (-this._canvasLeft + e.offsetX) / prevCanvasWidth - e.offsetX);
+      this.update(this._data);
+    })
+  }
+
+  _bindCanvasTranslate(canvas) {
+    let startX = -1;
+    const moveFn = (moveEvent) => {
+      const offset = moveEvent.offsetX - startX;
+      startX = moveEvent.offsetX;
+      // 左边界
+      if (this._canvasLeft >= 0 && offset > 0) return;
+      // 右边界
+      if (this._canvasLeft <= (this._container.clientWidth - canvas.clientWidth) && offset < 0) return;
+      this._canvasLeft += offset;
+      this._ctx.translate(offset, 0);
+    }
+    canvas.addEventListener('mousedown', (e) => {
+      startX = e.offsetX;
+      canvas.addEventListener('mousemove', moveFn);
+    });
+    canvas.addEventListener('mouseup', () => {
+      startX = -1;
+      canvas.removeEventListener('mousemove', moveFn);
+    });
+    canvas.addEventListener('mouseleave', () => {
+      startX = -1;
+      canvas.removeEventListener('mousemove', moveFn);
+    });
   }
 
   _bindWindowResize(container, canvas) {
@@ -74,13 +135,13 @@ class KLine {
   /**
    * 绑定弹窗触发事件，绘制虚线
    */
-  _bindPopTrigger(container) {
+  _bindPopTrigger() {
     const { canvas } = this._ctx;
-    container.addEventListener("mousemove", (e) => {
-      this._drawDashLine(e.offsetX, e.offsetY);
-      this._popUp(e.offsetX);
+    canvas.addEventListener("mousemove", (e) => {
+      this._drawDashLine(e.offsetX - this._canvasLeft, e.offsetY);
+      this._popUp(e.offsetX - this._canvasLeft);
     });
-    container.addEventListener("mouseleave", (e) => {
+    canvas.addEventListener("mouseleave", (e) => {
       this._hoverIndex = -1;
       this._pop.style.display = 'none';
       this._ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight)
@@ -93,7 +154,7 @@ class KLine {
    */
   _calcPxPerUnit() {
     // 计算 x 轴单位宽度
-    this._xAxisPxPerUnit = this._ctx.canvas.clientWidth / this._data.length;
+    this._xAxisPxPerUnit = this._container.clientWidth / this._renderNum;
 
     // 找出数据中的最大值和最小值
     let max = -Infinity, min = Infinity;
@@ -164,7 +225,8 @@ class KLine {
     const { canvas } = this._ctx;
     let [ x ] = this._valueToPx(item.date);
     const popDom = this._pop.getBoundingClientRect();
-    if (x > (canvas.clientWidth / 2)) {
+    x += this._canvasLeft;
+    if (x > (this._container.clientWidth / 2)) {
       x = x - popDom.width - 10;
     } else {
       x = x + 10;
@@ -205,7 +267,7 @@ class KLine {
     // 外边框
     this._ctx.setLineDash([]);
     this._ctx.strokeStyle = 'rgba(200, 200, 255, .3)';
-    this._ctx.strokeRect(1, 1, canvas.clientWidth - 2, canvas.clientHeight - 2);
+    this._ctx.strokeRect(1 - this._canvasLeft, 1, this._container.clientWidth - 2, this._container.clientHeight - 2);
 
     // 竖轴
     // 从左边第二个开始，每隔150px以上画一次x轴值，例如：每个数据占60px，150 / 60 = 2.xxx ， 所以每 2+1 个数据画一个值
@@ -251,7 +313,7 @@ class KLine {
     }
 
     // 横轴
-    // 间隔最大值 150px平均分割，从最小值开始
+    // 平均分为三份，从最小值开始
     const yStep = canvas.clientHeight / 3;
     for (let iPx = 0; iPx <= canvas.clientHeight; iPx += yStep) {
       const [_, yValue] = this._pxToValue(null, iPx);
@@ -261,7 +323,7 @@ class KLine {
       } else if (iPx === canvas.clientHeight) {
         y = iPx - 17;
       }
-      this._ctx.fillText(yValue.toFixed(1), 10, y);
+      this._ctx.fillText(yValue.toFixed(1), 10 - this._canvasLeft, y);
     }
   }
 
@@ -284,7 +346,7 @@ class KLine {
     const width = this._xAxisPxPerUnit,
           height = this._yAxisPxPerUnit * Math.abs(open - close);
 
-    const gap = 6;
+    const gap = 4;
     const drawX = x - ((width - gap) / 2);
     this._ctx.clearRect(drawX, y, width - gap, height);
     // 开盘价、收盘价
@@ -315,7 +377,9 @@ class KLine {
   update(data) {
     const { canvas } = this._ctx;
     this._data = data;
+    this._renderNum = this._renderNum > data.length ? data.length : this._renderNum;
     this._ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    this._ctx.translate(this._canvasLeft, 0);
     this.render();
   }
 

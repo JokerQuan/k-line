@@ -84,12 +84,24 @@ class KLine {
   _bindCanvasTranslate(canvas) {
     let startX = -1;
     const moveFn = (moveEvent) => {
-      const offset = moveEvent.offsetX - startX;
+      let offset = moveEvent.offsetX - startX;
       startX = moveEvent.offsetX;
       // 左边界
-      if (this._canvasLeft >= 0 && offset > 0) return;
+      if (this._canvasLeft >= 0 && offset > 0) {
+        return;
+      }
+      if (-this._canvasLeft < offset) {
+        // 拖动太快时防止超出边界
+        offset = -this._canvasLeft;
+      }
       // 右边界
-      if (this._canvasLeft <= (this._container.clientWidth - canvas.clientWidth) && offset < 0) return;
+      if (this._canvasLeft <= (this._container.clientWidth - canvas.clientWidth) && offset < 0) {
+        return;
+      }
+      if (this._canvasLeft - (this._container.clientWidth - canvas.clientWidth) < -offset) {
+        // 拖动太快时防止超出右边界
+        offset = this._canvasLeft - (this._container.clientWidth - canvas.clientWidth);
+      }
       this._canvasLeft += offset;
       this._ctx.translate(offset, 0);
     }
@@ -161,9 +173,14 @@ class KLine {
     const [left] = this._pxToValue(-this._canvasLeft, null);
     const leftIndex = this._data.findIndex(item => item.date === left);
 
-    const [right] = this._pxToValue(this._container.clientWidth - this._canvasLeft, null);
-    const rightIndex = this._data.findIndex(item => item.date === right);
+    // 右边界要处理最大值，否则会多一个空数据
+    let rightIndex = this._data.length - 1;
+    if (this._container.clientWidth - this._canvasLeft < this._ctx.canvas.width) {
+      const [right] = this._pxToValue(this._container.clientWidth - this._canvasLeft, null);
+      rightIndex = this._data.findIndex(item => item.date === right);
+    }
     const dataInViewPort = this._data.slice(leftIndex, rightIndex + 1);
+    
 
     // 找出数据中的最大值和最小值
     for (let i = 0; i < dataInViewPort.length; i++) {

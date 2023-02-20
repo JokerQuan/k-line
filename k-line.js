@@ -2,7 +2,28 @@ const COLOR_UP = 'rgb(255, 51, 51)';
 const COLOR_DOWN = 'rgb(10, 171, 98)';
 const FONT_12PX = '12px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
 const FONT_14PX = '14px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
-
+/**
+ * 大体思路
+ * 1、初始化canvas宽度：
+ *    默认一屏可见20个数据，那每个数据的宽度就是（容器宽度 / 20）
+ *    这样就可以算出canvas总宽度为（每个数据宽度 * 数据总量），高度就是容器高度
+ * 
+ * 2、坐标转换方式：
+ *    1）、已知 px ，求值（index）公式：Math.floor(px值 / 每个数据的宽度px)，即可拿到对应数据，
+ *        用途：tooltip 显示数据
+ *    2）、已知数据index，求数据在canvas中的绝对位置
+ *        用途：画所有数据（蜡烛图、轴线、竖虚线的吸附效果）
+ * 
+ * 3、拖拽：
+ *    监听鼠标事件，实时计算canvas的offset值，并在重新绘图时加入坐标轴、虚线、tooltip的位置计算
+ * 
+ * 4、缩放：
+ *    监听滚轮事件，重新给当前可见数据个数赋值，从而重新计算canvas的宽度
+ *    比如，放大时，同屏显示个数 +2，反之 -2，再用第一条的公式重新计算
+ * 
+ * 5、其他边界细节处理
+ * 
+ */
 class KLine {
   _container = null;
   _ctx = null;
@@ -26,8 +47,8 @@ class KLine {
 
   constructor(containerSel, data) {
     this._data = data;
-    this._init(containerSel);
     this._renderNum = this._renderNum > data.length ? data.length : this._renderNum;
+    this._init(containerSel);
     this.render();
   }
 
@@ -74,7 +95,7 @@ class KLine {
         canvas.width = this._container.clientWidth / this._renderNum * this._data.length;
       } else if (e.deltaY > 0) {
         // 缩小
-        if (this._renderNum >= 50) return;
+        if (this._renderNum >= 50 || this._renderNum === this._data.length) return;
         this._renderNum = this._renderNum + 2;
         canvas.width = this._container.clientWidth / this._renderNum * this._data.length;
       }

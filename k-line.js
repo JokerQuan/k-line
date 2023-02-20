@@ -1,5 +1,7 @@
 const COLOR_UP = 'rgb(255, 51, 51)';
 const COLOR_DOWN = 'rgb(10, 171, 98)';
+const FONT_12PX = '12px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
+const FONT_14PX = '14px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
 
 class KLine {
   _ctx = null;
@@ -139,7 +141,7 @@ class KLine {
     this._ctx.clearRect(0, offsetY - 8, 40, 16);
     this._ctx.fillRect(0, offsetY - 8, 40, 16);
     this._ctx.fillStyle = 'rgb(66, 66, 66)';
-    this._ctx.font = '12px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
+    this._ctx.font = FONT_12PX;
     this._ctx.fillText(yValue.toFixed(2), 5, offsetY + 4);
 
     // 横轴值
@@ -147,7 +149,7 @@ class KLine {
     this._ctx.clearRect(x - 30, canvas.clientHeight - 16, 60, 16);
     this._ctx.fillRect(x - 30, canvas.clientHeight - 16, 60, 16);
     this._ctx.fillStyle = 'rgb(66, 66, 66)';
-    this._ctx.font = '12px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
+    this._ctx.font = FONT_12PX;
     this._ctx.fillText(xValue, x - 28, canvas.clientHeight - 2);
   }
 
@@ -199,7 +201,68 @@ class KLine {
    * 画坐标轴
    */
   _drawAxis() {
+    const { canvas } = this._ctx;
+    // 外边框
+    this._ctx.setLineDash([]);
+    this._ctx.strokeStyle = 'rgba(200, 200, 255, .3)';
+    this._ctx.strokeRect(1, 1, canvas.clientWidth - 2, canvas.clientHeight - 2);
 
+    // 竖轴
+    // 从左边第二个开始，每隔150px以上画一次x轴值，例如：每个数据占60px，150 / 60 = 2.xxx ， 所以每 2+1 个数据画一个值
+    const xStep = Math.ceil(150 / this._xAxisPxPerUnit);
+    for (let i = 1; i < this._data.length; i += xStep) {
+      const [xPx] = this._valueToPx(this._data[i].date);
+      this._ctx.beginPath();
+      this._ctx.moveTo(xPx, 0);
+      this._ctx.lineTo(xPx, canvas.clientHeight);
+      this._ctx.stroke();
+      this._ctx.closePath();
+    }
+
+    // 横轴
+    // 间隔最大值 150px平均分割，从最小值开始
+    const yStep = canvas.clientHeight / 3;
+    for (let iPx = 0; iPx <= canvas.clientHeight; iPx += yStep) {
+      this._ctx.beginPath();
+      this._ctx.moveTo(0, iPx);
+      this._ctx.lineTo(canvas.clientWidth, iPx);
+      this._ctx.stroke();
+      this._ctx.closePath();
+    }
+  }
+
+  /**
+   * 画轴值
+   */
+  _drawAxisStepValue() {
+    const { canvas } = this._ctx;
+    // 外边框
+    this._ctx.setLineDash([]);
+    // 轴值字体
+    this._ctx.fillStyle = 'black';
+    this._ctx.font = FONT_14PX;
+
+    // 竖轴
+    // 从左边第二个开始，每隔150px以上画一次x轴值，例如：每个数据占60px，150 / 60 = 2.xxx ， 所以每 2+1 个数据画一个值
+    const xStep = Math.ceil(150 / this._xAxisPxPerUnit);
+    for (let i = 1; i < this._data.length; i += xStep) {
+      const [xPx] = this._valueToPx(this._data[i].date);
+      this._ctx.fillText(this._data[i].date, xPx - 32, canvas.clientHeight - 7)
+    }
+
+    // 横轴
+    // 间隔最大值 150px平均分割，从最小值开始
+    const yStep = canvas.clientHeight / 3;
+    for (let iPx = 0; iPx <= canvas.clientHeight; iPx += yStep) {
+      const [_, yValue] = this._pxToValue(null, iPx);
+      let y = iPx + 7;
+      if (iPx === 0) {
+        y = iPx + 24;
+      } else if (iPx === canvas.clientHeight) {
+        y = iPx - 17;
+      }
+      this._ctx.fillText(yValue.toFixed(1), 10, y);
+    }
   }
 
   _drawCandle(item) {
@@ -222,14 +285,15 @@ class KLine {
           height = this._yAxisPxPerUnit * Math.abs(open - close);
 
     const gap = 6;
-    this._ctx.clearRect(x - (width/2), y, width, height);
+    const drawX = x - ((width - gap) / 2);
+    this._ctx.clearRect(drawX, y, width - gap, height);
     // 开盘价、收盘价
     if (open > close) {
       this._ctx.fillStyle = COLOR_DOWN;
-      this._ctx.fillRect(x - ((width - gap) / 2), y, width - gap, height);
+      this._ctx.fillRect(drawX, y, width - gap, height);
     } else {
       this._ctx.strokeStyle = COLOR_UP;
-      this._ctx.strokeRect(x - ((width - gap) / 2), y, width - gap, height);
+      this._ctx.strokeRect(drawX, y, width - gap, height);
     }
   }
 
@@ -257,8 +321,10 @@ class KLine {
 
   render() {
     this._calcPxPerUnit();
+    this._drawAxis();
     for(let i = 0; i < this._data.length; i++) {
       this._drawCandle(this._data[i]);
     }
+    this._drawAxisStepValue();
   }
 }

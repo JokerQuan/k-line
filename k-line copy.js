@@ -1,6 +1,3 @@
-const COLOR_UP = 'rgb(255, 51, 51)';
-const COLOR_DOWN = 'rgb(10, 171, 98)';
-
 class KLine {
   _ctx = null;
   _data = [];
@@ -133,13 +130,13 @@ class KLine {
     this._ctx.lineTo(x, canvas.height);
     this._ctx.stroke();
 
-    const [ xValue, yValue ] = this._pxToValue(offsetX, offsetY);
     // 纵轴值
     this._ctx.fillStyle = 'rgb(245, 245, 245)';
     this._ctx.clearRect(0, offsetY - 8, 40, 16);
     this._ctx.fillRect(0, offsetY - 8, 40, 16);
     this._ctx.fillStyle = 'rgb(66, 66, 66)';
     this._ctx.font = '12px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
+    const yValue = (canvas.clientHeight - offsetY) / canvas.clientHeight * (this._yAxisMax - this._yAxisOriginMin) + this._yAxisOriginMin;
     this._ctx.fillText(yValue.toFixed(2), 5, offsetY + 4);
 
     // 横轴值
@@ -148,6 +145,7 @@ class KLine {
     this._ctx.fillRect(x - 30, canvas.clientHeight - 16, 60, 16);
     this._ctx.fillStyle = 'rgb(66, 66, 66)';
     this._ctx.font = '12px "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
+    const xValue = this._data[Math.floor(offsetX / this._xAxisPxPerUnit)].date;
     this._ctx.fillText(xValue, x - 28, canvas.clientHeight - 2);
   }
 
@@ -160,7 +158,7 @@ class KLine {
     const item = this._data[index];
     const { open, close, high, low } = item.kline;
     const { canvas } = this._ctx;
-    let [ x ] = this._valueToPx(item.date);
+    let x = this._xAxisPxPerUnit * (Math.ceil(offsetX / this._xAxisPxPerUnit) - 0.5);
     const popDom = this._pop.getBoundingClientRect();
     if (x > (canvas.clientWidth / 2)) {
       x = x - popDom.width - 10;
@@ -175,11 +173,11 @@ class KLine {
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px">
         <span>开盘价</span>
-        <span style="color: ${open > close ? COLOR_DOWN : COLOR_UP}">${open.toFixed(3)}</span>
+        <span style="color: ${open > close ? 'green' : 'red'}">${open.toFixed(3)}</span>
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px">
         <span>收盘价</span>
-        <span style="color: ${open > close ? COLOR_DOWN : COLOR_UP}">${close.toFixed(3)}</span>
+        <span style="color: ${open > close ? 'green' : 'red'}">${close.toFixed(3)}</span>
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px">
         <span>最高价</span>
@@ -202,14 +200,16 @@ class KLine {
 
   }
 
-  _drawCandle(item) {
+  _drawCandle(item, index) {
     const { open, close, high, low } = item.kline;
-    this._ctx.strokeStyle = open > close ? COLOR_DOWN : COLOR_UP;
+    this._ctx.strokeStyle = open > close ? 'rgb(10, 171, 98)' : 'rgb(255, 51, 51)';
 
     // 最高价、最低价
     if (high > Math.max(open, close)) {
-      const [ highX, highY ] = this._valueToPx(item.date, high);
-      const [ lowX, lowY ] = this._valueToPx(item.date, low);
+      const highX = this._xAxisPxPerUnit * index + this._xAxisPxPerUnit / 2;
+      const highY = this._yAxisPxPerUnit * (this._yAxisMax - high);
+      const lowX = highX;
+      const lowY = this._yAxisPxPerUnit * (this._yAxisMax - low);
       this._ctx.beginPath();
       this._ctx.setLineDash([]);
       this._ctx.moveTo(highX, highY);
@@ -217,35 +217,25 @@ class KLine {
       this._ctx.stroke();
     }
     
-    const [ x, y ] = this._valueToPx(item.date, Math.max(open, close));
-    const width = this._xAxisPxPerUnit,
+    const x = this._xAxisPxPerUnit * index,
+          y = this._yAxisPxPerUnit * (this._yAxisMax - (Math.max(open, close))),
+          width = this._xAxisPxPerUnit,
           height = this._yAxisPxPerUnit * Math.abs(open - close);
 
-    const gap = 6;
-    this._ctx.clearRect(x - (width/2), y, width, height);
+    this._ctx.clearRect(x, y, width, height);
     // 开盘价、收盘价
     if (open > close) {
-      this._ctx.fillStyle = COLOR_DOWN;
-      this._ctx.fillRect(x - ((width - gap) / 2), y, width - gap, height);
+      this._ctx.fillStyle = 'rgb(10,171,98)';
+      this._ctx.fillRect(x + 1, y, width - 2, height);
     } else {
-      this._ctx.strokeStyle = COLOR_UP;
-      this._ctx.strokeRect(x - ((width - gap) / 2), y, width - gap, height);
+      this._ctx.strokeStyle = 'rgb(255, 51, 51)';
+      this._ctx.strokeRect(x + 1, y, width - 2, height);
     }
   }
 
-  _valueToPx(x = 0, y = 0) {
-    const xIndex = this._data.findIndex((item) => item.date === x);
-    const xPx = (xIndex + 0.5) * this._xAxisPxPerUnit;
-    const yPx = this._yAxisPxPerUnit * (this._yAxisMax - y);
-    return [xPx, yPx];
-  }
-
-  _pxToValue(xPx = 0, yPx = 0) {
+  _valueToPx(value) {
     const { canvas } = this._ctx;
-    const index = Math.floor(xPx / this._xAxisPxPerUnit);
-    const xValue = this._data[index].date
-    const yValue = (canvas.clientHeight - yPx) / canvas.clientHeight * (this._yAxisMax - this._yAxisOriginMin) + this._yAxisOriginMin;
-    return [xValue, yValue];
+    return canvas.clientHeight - ((this._yAxisMax - value) * canvas.clientHeight) / (this._yAxisMax - this._yAxisOriginMin);
   }
 
   update(data) {
@@ -258,7 +248,7 @@ class KLine {
   render() {
     this._calcPxPerUnit();
     for(let i = 0; i < this._data.length; i++) {
-      this._drawCandle(this._data[i]);
+      this._drawCandle(this._data[i], i);
     }
   }
 }

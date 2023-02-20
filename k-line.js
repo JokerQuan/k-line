@@ -156,10 +156,18 @@ class KLine {
     // 计算 x 轴单位宽度
     this._xAxisPxPerUnit = this._container.clientWidth / this._renderNum;
 
-    // 找出数据中的最大值和最小值
     let max = -Infinity, min = Infinity;
-    for (let i = 0; i < this._data.length; i++) {
-      const { open, high, low, close } = this._data[i].kline;
+    // 计算当前比例能在容器中显示的数据下标
+    const [left] = this._pxToValue(-this._canvasLeft, null);
+    const leftIndex = this._data.findIndex(item => item.date === left);
+
+    const [right] = this._pxToValue(this._container.clientWidth - this._canvasLeft, null);
+    const rightIndex = this._data.findIndex(item => item.date === right);
+    const dataInViewPort = this._data.slice(leftIndex, rightIndex + 1);
+
+    // 找出数据中的最大值和最小值
+    for (let i = 0; i < dataInViewPort.length; i++) {
+      const { open, high, low, close } = dataInViewPort[i].kline;
       const dayMax = Math.max(open, high, low, close);
       max = max > dayMax ? max : dayMax;
       const dayMin = Math.min(open, high, low, close);

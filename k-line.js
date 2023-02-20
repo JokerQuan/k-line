@@ -49,6 +49,9 @@ class KLine {
     // canvas.height = container.clientHeight * 2;
     // this._ctx.scale(2, 2);
 
+    // 默认显示最近日期的数据
+    this._canvasLeft = container.clientWidth - canvas.width;
+    this._ctx.translate(this._canvasLeft, 0);
     // tooltip
     this._createPop(container);
     this._bindPopTrigger(canvas);

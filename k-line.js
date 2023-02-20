@@ -77,6 +77,12 @@ class KLine {
       }
       // 固定鼠标位置的offset比例缩放
       this._canvasLeft = -(canvas.width * (-this._canvasLeft + e.offsetX) / prevCanvasWidth - e.offsetX);
+      // 处理边界问题
+      if (this._canvasLeft > 0) {
+        this._canvasLeft = 0;
+      } else if (this._canvasLeft < (this._container.clientWidth - canvas.width)) {
+        this._canvasLeft = this._container.clientWidth - canvas.width;
+      }
       this.update(this._data);
     })
   }

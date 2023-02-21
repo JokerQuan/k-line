@@ -130,7 +130,7 @@ class KLine {
       }
       if (this._canvasLeft - (this._container.clientWidth - canvas.clientWidth) < -offset) {
         // 拖动太快时防止超出右边界
-        offset = this._canvasLeft - (this._container.clientWidth - canvas.clientWidth);
+        offset = (this._container.clientWidth - canvas.clientWidth) - this._canvasLeft;
       }
       this._canvasLeft += offset;
       this._ctx.translate(offset, 0);
